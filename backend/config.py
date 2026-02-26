@@ -4,8 +4,8 @@ from enum import Enum
 
 load_dotenv()
 
-GROQ_KEY = os.getenv('GROQ_API')
-MAX_CHUNK_SIZE = os.getenv('MAX_CHUNK_SIZE')
+GROQ_KEY = os.getenv('GROQ_KEY')
+MAX_CHUNK_SIZE = int(os.getenv('MAX_CHUNK_SIZE'))
 
 
 class Status(Enum):

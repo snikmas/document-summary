@@ -1,5 +1,5 @@
 import uuid
-from config import Status
+from backend.config import Status
 jobs = {}
 
 def create_job():

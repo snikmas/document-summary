@@ -19,7 +19,7 @@ Rules:
 3. Just JSON
 4. Answer in the same language as the document"""
 
-def call_llm(text: str) -> DocumentSummary:
+def call_llm(text: list[str]) -> DocumentSummary:
 
     for attempt in range(2):
         try:

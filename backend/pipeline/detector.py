@@ -8,10 +8,13 @@ def detect_file_type(filename: str, file_bytes: bytes) -> str:
     # data = file_bytes.read(2048)
     mime_type = magic.from_buffer(file_bytes[:2048], mime=True)
 
+    # does it possible that no /?
+    if '/' not in mime_type:
+        raise KeyError('mime-type problem')
+        
     parts = mime_type.split('/')
     if len(parts) > 1:
         subtype = parts[1].lower()
-
     if subtype in EXTENSION_MAP:
         return subtype
     else:

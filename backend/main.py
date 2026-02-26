@@ -1,10 +1,10 @@
 from fastapi import FastAPI, BackgroundTasks, UploadFile, HTTPException
-from jobs import create_job, jobs
+from backend.jobs import create_job, jobs
 from backend.pipeline.extractor import extract_text
 from backend.pipeline.cleaner import clean_text
 from backend.pipeline.llm import get_summary_from_llm
 from backend.pipeline.chunker import chunk_text
-from config import Status
+from backend.config import Status
 
 app = FastAPI()
 
@@ -36,15 +36,13 @@ async def upload_file(file: UploadFile, background_tasks: BackgroundTasks):
     return {'job_id': job_id}
 
 
-# get a job: this func is trying to find this job in a dict
-# from a user perspective: do we really need this /jobs links? for users it doesnt amke any sense
 @app.get('/jobs/{job_id}')
 async def get_job(job_id: str):
     #getresut or what?
     job = jobs.get(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    return {'status': job['status']}
+    return {'status': job['status'].value}
 
 
 @app.get('/jobs/{job_id}/result')

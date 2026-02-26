@@ -10,7 +10,7 @@ def chunk_text(text: str, max_chars: int = 8000) -> list[str]:
             chanks.append(cur_par)
             cur_par = '\n\n' + parag
         else:
-            cur_par += parag
+            cur_par += '\n\n' + parag
     chanks.append(cur_par)
 
     return chanks
