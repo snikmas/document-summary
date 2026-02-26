@@ -1,11 +1,12 @@
 EXTENSION_MAP = {
     'pdf':     'pdf',
     'txt':     'txt',
-    'plain':   'text',
+    'plain':   'txt',
     'csv':     'csv',
     'docx':    'docx',
     'msword':  'docx',
-    'doc':     'docx',   # both map to same handler
+    'doc':     'docx',
+    'vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
     'html':    'html',
-    'htm':     'html',   # both map to same handler
+    'htm':     'html',
 }

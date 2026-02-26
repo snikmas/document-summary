@@ -3,3 +3,5 @@ data_test/
 # config.py
 __pycache__
 .env
+CLAUDE.md
+problems.md

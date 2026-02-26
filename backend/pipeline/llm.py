@@ -2,10 +2,14 @@ import json
 from pydantic import ValidationError
 from backend.models import DocumentSummary
 from backend import config
-from groq import Groq
+from google import genai
 
-# will it run?
-CLIENT = Groq(api_key=config.GROQ_KEY)
+if not config.GEMINI_KEY:
+    raise RuntimeError("GEMINI_KEY is not set in .env")
+
+CLIENT = genai.Client(api_key=config.GEMINI_KEY)
+MODEL = 'gemini-2.0-flash'
+
 PROMPT = """You are a document summarizer. Respond ONLY with valid JSON in this exact format:
 {
     "summary": "2-3 sentence summary of the document",
@@ -19,35 +23,34 @@ Rules:
 3. Just JSON
 4. Answer in the same language as the document"""
 
-def call_llm(text: list[str]) -> DocumentSummary:
+def call_llm(text: str) -> DocumentSummary:
 
     for attempt in range(2):
         try:
-            response = CLIENT.chat.completions.create(
-                model='llama-3.1-8b-instant',
-                messages=[
-                    {'role': 'system', 'content': PROMPT},
-                    {'role': 'user', 'content': text}
-                ]
+            response = CLIENT.models.generate_content(
+                model=MODEL,
+                contents=f"{PROMPT}\n\nDocument:\n{text}"
             )
-            res_text = response.choices[0].message.content
+            res_text = response.text.strip()
+            if res_text.startswith("```"):
+                res_text = res_text.split("\n", 1)[1].rsplit("```", 1)[0].strip()
 
             data = json.loads(res_text)
             return DocumentSummary(**data)
-        
+
         except (json.JSONDecodeError, ValidationError):
             if attempt == 0:
                 continue
             raise
-    
 
-def get_summary_from_llm(text_chunks: str) -> DocumentSummary:
+
+def get_summary_from_llm(text_chunks: list[str]) -> DocumentSummary:
 
     summaries = [call_llm(chunk) for chunk in text_chunks]
 
     if len(summaries) == 1:
         return summaries[0]
-    
+
     combined = '\n\n'.join([s.summary for s in summaries])
 
     return call_llm(combined)

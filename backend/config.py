@@ -5,7 +5,8 @@ from enum import Enum
 load_dotenv()
 
 GROQ_KEY = os.getenv('GROQ_KEY')
-MAX_CHUNK_SIZE = int(os.getenv('MAX_CHUNK_SIZE'))
+GEMINI_KEY = os.getenv('GEMINI_KEY')
+MAX_CHUNK_SIZE = int(os.getenv('MAX_CHUNK_SIZE', 8000))
 
 
 class Status(Enum):

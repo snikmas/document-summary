@@ -9,7 +9,7 @@ from backend.pipeline.detector import detect_file_type
 
 def extract_text(filename: str, file_bytes: bytes) -> str:
 
-    file_format = detect_file_type(filename, file_bytes)
+    file_format = detect_file_type(file_bytes)
 
     match file_format: # file is bytes
         case 'pdf':
@@ -32,7 +32,7 @@ def extract_pdf(file_bytes):
     file = io.BytesIO(file_bytes)
     reader = PdfReader(file)
     #what if its a large document? chunks?
-    content = '\n'.join(p.extract_text() for p in reader.pages)
+    content = '\n'.join(p.extract_text() or '' for p in reader.pages)
     return content
 
 # need bytesio

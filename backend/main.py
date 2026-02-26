@@ -42,7 +42,10 @@ async def get_job(job_id: str):
     job = jobs.get(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    return {'status': job['status'].value}
+    data = {'status': job['status'].value}
+    if job['error']:
+        data['error'] = job['error']
+    return data
 
 
 @app.get('/jobs/{job_id}/result')
