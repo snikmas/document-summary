@@ -2,7 +2,7 @@ import unicodedata
 import re
 
 def clean_text(text: str) -> str:
-    # text is a .. list of lines? or what
+    
     # 1. strip null bytes
     text = text.replace('\x00', '')
     # 2. normalize unicode

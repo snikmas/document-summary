@@ -43,8 +43,6 @@ def call_llm(text: str) -> DocumentSummary:
 
 def get_summary_from_llm(text_chunks: str) -> DocumentSummary:
 
-    result = []
-
     summaries = [call_llm(chunk) for chunk in text_chunks]
 
     if len(summaries) == 1:

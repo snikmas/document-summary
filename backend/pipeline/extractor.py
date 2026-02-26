@@ -9,13 +9,7 @@ from backend.pipeline.detector import detect_file_type
 
 def extract_text(filename: str, file_bytes: bytes) -> str:
 
-    
-    # file = io.BytesIO(file_bytes)
-    # file = file_bytes.decode('utf-8', errors='replace')
-
     file_format = detect_file_type(filename, file_bytes)
-
-    #1. check if a file ok? format or correptuer
 
     match file_format: # file is bytes
         case 'pdf':
