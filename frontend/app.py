@@ -15,6 +15,10 @@ SUPPORTED_TYPES = ['pdf', 'docx', 'txt', 'html', 'csv']
 # 1. init state
 if 'job_id' not in st.session_state:
     st.session_state.job_id = None
+if 'poll_start' not in st.session_state:
+    st.session_state.poll_start = None
+
+POLL_TIMEOUT = 300  # 5 minutes max polling
 
 
 # 2. ui
@@ -27,6 +31,7 @@ uploaded_file = st.file_uploader("Upload your file", type=SUPPORTED_TYPES)
 # reset job when file is removed from the uploader
 if uploaded_file is None and st.session_state.job_id is not None:
     st.session_state.job_id = None
+    st.session_state.poll_start = None
     st.rerun()
 
 # U8: file info preview after selection
@@ -57,6 +62,7 @@ if uploaded_file is not None and st.session_state.job_id is None:
                 )
                 res.raise_for_status()
             st.session_state.job_id = res.json()['job_id']
+            st.session_state.poll_start = time.time()
             st.rerun()
         except requests.exceptions.ConnectionError:
             st.error("Cannot reach the server. Make sure the backend is running.")
@@ -123,16 +129,25 @@ if st.session_state.job_id:
         st.divider()
         if st.button("Process another file"):
             st.session_state.job_id = None
+            st.session_state.poll_start = None
             st.rerun()
 
-    elif status == 'processing' or status == 'pending':
-        if status == 'pending':
-            msg = "Queued, waiting to start..."
+    elif status in ('processing', 'pending'):
+        elapsed = time.time() - (st.session_state.poll_start or time.time())
+        if elapsed > POLL_TIMEOUT:
+            st.error("Processing is taking too long. The server may be overloaded or the AI service is unavailable.")
+            if st.button("Try again"):
+                st.session_state.job_id = None
+                st.session_state.poll_start = None
+                st.rerun()
         else:
-            msg = "Analyzing your document..."
-        with st.spinner(msg):
-            time.sleep(2)
-        st.rerun()
+            if status == 'pending':
+                msg = "Queued, waiting to start..."
+            else:
+                msg = "Analyzing your document..."
+            with st.spinner(msg):
+                time.sleep(2)
+            st.rerun()
 
     elif status == 'failed':
         error_detail = status_data.get('error', '')
@@ -141,6 +156,7 @@ if st.session_state.job_id:
         else:
             st.error("Processing failed. The file may be unsupported or corrupted.")
 
-        if st.button("Try another file"):
+        if st.button("Try again"):
             st.session_state.job_id = None
+            st.session_state.poll_start = None
             st.rerun()
