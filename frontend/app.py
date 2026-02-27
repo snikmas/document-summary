@@ -24,6 +24,11 @@ st.caption("Upload any document — PDF, DOCX, TXT, HTML, or CSV — and get an 
 # U4: restrict uploader to supported types
 uploaded_file = st.file_uploader("Upload your file", type=SUPPORTED_TYPES)
 
+# reset job when file is removed from the uploader
+if uploaded_file is None and st.session_state.job_id is not None:
+    st.session_state.job_id = None
+    st.rerun()
+
 # U8: file info preview after selection
 if uploaded_file is not None and st.session_state.job_id is None:
     file_size = uploaded_file.size
@@ -39,24 +44,24 @@ if uploaded_file is not None and st.session_state.job_id is None:
 
 # 3. handle upload
 if uploaded_file is not None and st.session_state.job_id is None:
-    filename = uploaded_file.name
-    file_bytes = uploaded_file.read()
-    content_type = uploaded_file.type
+    if st.button("Summarize it", type="primary"):
+        filename = uploaded_file.name
+        file_bytes = uploaded_file.read()
+        content_type = uploaded_file.type
 
-
-    try:
-        with st.spinner("Uploading file..."):
-            res = requests.post(
-                f'{API_URL}/process',
-                files={'file': (filename, file_bytes, content_type)}
-            )
-            res.raise_for_status()
-        st.session_state.job_id = res.json()['job_id']
-        st.rerun()
-    except requests.exceptions.ConnectionError:
-        st.error("Cannot reach the server. Make sure the backend is running.")
-    except requests.exceptions.RequestException as e:
-        st.error(f"Upload failed: {e}")
+        try:
+            with st.spinner("Uploading file..."):
+                res = requests.post(
+                    f'{API_URL}/process',
+                    files={'file': (filename, file_bytes, content_type)}
+                )
+                res.raise_for_status()
+            st.session_state.job_id = res.json()['job_id']
+            st.rerun()
+        except requests.exceptions.ConnectionError:
+            st.error("Cannot reach the server. Make sure the backend is running.")
+        except requests.exceptions.RequestException as e:
+            st.error(f"Upload failed: {e}")
 
 
 # 4. poll if job is running
@@ -75,7 +80,13 @@ if st.session_state.job_id:
     if status == 'done':
         st.success("Analysis complete!")
 
-        result = requests.get(f'{API_URL}/jobs/{st.session_state.job_id}/result').json()
+        try:
+            resp = requests.get(f'{API_URL}/jobs/{st.session_state.job_id}/result')
+            resp.raise_for_status()
+            result = resp.json()
+        except requests.exceptions.RequestException:
+            st.error("Failed to fetch results. Please try again.")
+            st.stop()
 
         col1, col2 = st.columns(2)
         col1.metric("Language", result.get('language', 'N/A'))

@@ -14,7 +14,7 @@ def chunk_text(text: str, max_chars: int = MAX_CHUNK_SIZE) -> list[str]:
                 cur_par = ''
             for i in range(0, len(parag), max_chars):
                 chunks.append(parag[i:i + max_chars])
-        elif len(cur_par) + len(parag) > max_chars:
+        elif len(cur_par) + 2 + len(parag) > max_chars:
             chunks.append(cur_par)
             cur_par = parag
         else:

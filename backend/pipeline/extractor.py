@@ -7,7 +7,7 @@ import csv
 from backend.pipeline.detector import detect_file_type
 
 
-def extract_text(filename: str, file_bytes: bytes) -> str:
+def extract_text(file_bytes: bytes) -> str:
 
     file_format = detect_file_type(file_bytes)
 
@@ -23,7 +23,7 @@ def extract_text(filename: str, file_bytes: bytes) -> str:
         case 'csv':
             content = extract_csv(file_bytes)
         case _:
-            raise ValueError(f"Unsuppported file type: {file_format}")
+            raise ValueError(f"Unsupported file type: {file_format}")
     
 
     return content
