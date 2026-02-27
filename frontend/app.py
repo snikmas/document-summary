@@ -1,7 +1,10 @@
 import streamlit as st
 import time
 import json
+import io
 import requests
+from fpdf import FPDF
+from docx import Document
 
 st.set_page_config(
     page_title="DocPipeline",
@@ -106,31 +109,71 @@ if st.session_state.job_id:
         st.markdown(points_md)
 
         st.divider()
-        dl_col1, dl_col2 = st.columns(2)
-        with dl_col1:
-            summary_text = f"Summary\n{'=' * 40}\n{result['summary']}\n\nKey Points\n{'=' * 40}\n"
-            summary_text += '\n'.join(f"- {p}" for p in result['key_points'])
-            summary_text += f"\n\nLanguage: {result.get('language', 'N/A')}"
-            summary_text += f"\nWord Count: {result.get('word_count', 'N/A')}"
-            st.download_button(
-                label="Download as TXT",
-                data=summary_text,
-                file_name="summary.txt",
-                mime="text/plain"
-            )
-        with dl_col2:
-            st.download_button(
-                label="Download as JSON",
-                data=json.dumps(result, indent=2, ensure_ascii=False),
-                file_name="summary.json",
-                mime="application/json"
-            )
+        dl_col, _, reset_col = st.columns([1, 2, 1])
+        with dl_col:
+            with st.popover(":material/download: Download"):
+                # Markdown
+                md_text = f"# Summary\n\n{result['summary']}\n\n## Key Points\n\n"
+                md_text += '\n'.join(f"- {p}" for p in result['key_points'])
+                md_text += f"\n\n**Language:** {result.get('language', 'N/A')}  \n"
+                md_text += f"**Word Count:** {result.get('word_count', 'N/A')}\n"
+                st.download_button(
+                    label=":material/description: Markdown (.md)",
+                    data=md_text,
+                    file_name="summary.md",
+                    mime="text/markdown",
+                    use_container_width=True,
+                )
 
-        st.divider()
-        if st.button("Process another file"):
-            st.session_state.job_id = None
-            st.session_state.poll_start = None
-            st.rerun()
+                # PDF
+                pdf = FPDF()
+                pdf.add_page()
+                pdf.set_font("Helvetica", "B", 16)
+                pdf.cell(text="Summary", new_x="LMARGIN", new_y="NEXT")
+                pdf.ln(4)
+                pdf.set_font("Helvetica", size=11)
+                pdf.multi_cell(w=0, text=result['summary'])
+                pdf.ln(6)
+                pdf.set_font("Helvetica", "B", 16)
+                pdf.cell(text="Key Points", new_x="LMARGIN", new_y="NEXT")
+                pdf.ln(4)
+                pdf.set_font("Helvetica", size=11)
+                for p in result['key_points']:
+                    pdf.multi_cell(w=0, text=f"  \u2022  {p}")
+                    pdf.ln(2)
+                pdf.ln(4)
+                pdf.set_font("Helvetica", "I", 10)
+                pdf.cell(text=f"Language: {result.get('language', 'N/A')}  |  Word Count: {result.get('word_count', 'N/A')}")
+                st.download_button(
+                    label=":material/picture_as_pdf: PDF (.pdf)",
+                    data=bytes(pdf.output()),
+                    file_name="summary.pdf",
+                    mime="application/pdf",
+                    use_container_width=True,
+                )
+
+                # DOCX
+                doc = Document()
+                doc.add_heading("Summary", level=1)
+                doc.add_paragraph(result['summary'])
+                doc.add_heading("Key Points", level=1)
+                for p in result['key_points']:
+                    doc.add_paragraph(p, style="List Bullet")
+                doc.add_paragraph(f"Language: {result.get('language', 'N/A')}  |  Word Count: {result.get('word_count', 'N/A')}")
+                buf = io.BytesIO()
+                doc.save(buf)
+                st.download_button(
+                    label=":material/draft: Word (.docx)",
+                    data=buf.getvalue(),
+                    file_name="summary.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    use_container_width=True,
+                )
+        with reset_col:
+            if st.button("Process another file"):
+                st.session_state.job_id = None
+                st.session_state.poll_start = None
+                st.rerun()
 
     elif status in ('processing', 'pending'):
         elapsed = time.time() - (st.session_state.poll_start or time.time())
