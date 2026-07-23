@@ -2,6 +2,8 @@
 
 Upload a document — PDF, DOCX, TXT, HTML, or CSV — and get back a structured AI-powered summary with key points, detected language, and word count. Built as two separate services (FastAPI backend + Streamlit frontend) communicating over HTTP, mirroring real production architecture.
 
+**Portfolio angle:** async document pipeline + format extractors + chunking + Gemini structured output. Useful demo for “AI backend utility” freelance/intern work.
+
 ## Architecture
 
 ```
