@@ -1,0 +1,62 @@
+services:
+  api:
+    build:
+      context: .
+    environment:
+      SUMMARY_MODE: ${SUMMARY_MODE:-demo}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-meta-llama/llama-3.3-70b-instruct:free}
+      DATABASE_URL: sqlite:////app/data/document-summary.sqlite3
+      MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-52428800}
+      MAX_CHUNK_SIZE: ${MAX_CHUNK_SIZE:-8000}
+    ports:
+      - "8000:8000"
+    volumes:
+      - document_data:/app/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)",
+        ]
+      interval: 5s
+      timeout: 4s
+      retries: 12
+      start_period: 5s
+
+  ui:
+    build:
+      context: .
+    command:
+      [
+        "streamlit",
+        "run",
+        "frontend/app.py",
+        "--server.address=0.0.0.0",
+        "--server.port=8501",
+        "--server.headless=true",
+      ]
+    environment:
+      BACKEND_API_URL: http://api:8000
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "8501:8501"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health', timeout=3)",
+        ]
+      interval: 5s
+      timeout: 4s
+      retries: 12
+      start_period: 5s
+
+volumes:
+  document_data:

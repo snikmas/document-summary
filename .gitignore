@@ -1,7 +1,13 @@
 .venv/
 data_test/
-# config.py
 __pycache__
 .env
 CLAUDE.md
 problems.md
+PORTFOLIO_TODO.md
+.agent/
+.pytest_cache/
+.ruff_cache/
+data/
+*.sqlite3
+.gstack/

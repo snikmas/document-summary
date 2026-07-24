@@ -1,0 +1,14 @@
+.git
+.github
+.agent
+.venv
+.pytest_cache
+.ruff_cache
+__pycache__
+*.py[cod]
+.env
+data
+tests
+scripts
+assets
+PORTFOLIO_TODO.md

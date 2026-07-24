@@ -1,19 +1,21 @@
-import unicodedata
 import re
+import unicodedata
+
+_ALLOWED_CONTROLS = {"\n", "\t"}
+
 
 def clean_text(text: str) -> str:
-    
-    # 1. strip null bytes
-    text = text.replace('\x00', '')
-    # 2. normalize unicode
-    text = unicodedata.normalize('NFKC', text)
-    # 3. per-line trim
-    lines = [line.strip() for line in text.splitlines()]
-    text = '\n'.join(lines)
+    """Normalize extracted text while preserving useful paragraph boundaries."""
 
-    # 4. collapse spaces (not newlines)
-    text = re.sub(r'[^\S\n]+', ' ', text)        
-    # 5. max 2 consecutive newlines     
-    text = re.sub(r'\n{3,}', '\n\n', text)       
-    
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    text = "".join(
+        character
+        for character in text
+        if character in _ALLOWED_CONTROLS or not unicodedata.category(character).startswith("C")
+    )
+    text = unicodedata.normalize("NFKC", text)
+    lines = [line.strip() for line in text.splitlines()]
+    text = "\n".join(lines)
+    text = re.sub(r"[^\S\n]+", " ", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
     return text.strip()

@@ -1,28 +1,34 @@
-from backend.config import MAX_CHUNK_SIZE
+DEFAULT_MAX_CHARS = 8_000
 
-def chunk_text(text: str, max_chars: int = MAX_CHUNK_SIZE) -> list[str]:
 
-    paragraphs = [p for p in text.split('\n\n') if p.strip()]
-    cur_par = ''
+def chunk_text(text: str, max_chars: int = DEFAULT_MAX_CHARS) -> list[str]:
+    """Split text deterministically with a hard upper bound per chunk."""
 
-    chunks = []
-    for parag in paragraphs:
-        # split oversized paragraphs that exceed max_chars on their own
-        if len(parag) > max_chars:
-            if cur_par:
-                chunks.append(cur_par)
-                cur_par = ''
-            for i in range(0, len(parag), max_chars):
-                chunks.append(parag[i:i + max_chars])
-        elif len(cur_par) + 2 + len(parag) > max_chars:
-            chunks.append(cur_par)
-            cur_par = parag
+    if max_chars < 1:
+        raise ValueError("max_chars must be positive")
+
+    paragraphs = [paragraph.strip() for paragraph in text.split("\n\n") if paragraph.strip()]
+    chunks: list[str] = []
+    current = ""
+
+    for paragraph in paragraphs:
+        if len(paragraph) > max_chars:
+            if current:
+                chunks.append(current)
+                current = ""
+            chunks.extend(
+                paragraph[index : index + max_chars]
+                for index in range(0, len(paragraph), max_chars)
+            )
+            continue
+
+        candidate = f"{current}\n\n{paragraph}" if current else paragraph
+        if len(candidate) > max_chars:
+            chunks.append(current)
+            current = paragraph
         else:
-            if cur_par:
-                cur_par += '\n\n' + parag
-            else:
-                cur_par = parag
-    if cur_par:
-        chunks.append(cur_par)
+            current = candidate
 
+    if current:
+        chunks.append(current)
     return chunks

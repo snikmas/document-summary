@@ -1,115 +1,196 @@
 # Document Intelligence Pipeline
 
-Upload a document — PDF, DOCX, TXT, HTML, or CSV — and get back a structured AI-powered summary with key points, detected language, and word count. Built as two separate services (FastAPI backend + Streamlit frontend) communicating over HTTP, mirroring real production architecture.
+A portfolio-ready document processing application for turning business files
+into structured summaries and downloadable reports.
 
-**Portfolio angle:** async document pipeline + format extractors + chunking + Gemini structured output. Useful demo for “AI backend utility” freelance/intern work.
+Upload a PDF, DOCX, TXT, HTML, or CSV document. The application validates and
+extracts the content, processes it in deterministic offline mode or through
+OpenRouter, stores the job and result in SQLite, and exports the result as
+Markdown, Word, or PDF.
+
+![Upload and sample selection](assets/01-upload.png)
+
+## What a client gets
+
+- A clear upload and bundled-sample workflow.
+- Structured summary, key points, language, and source word count.
+- Processing metadata for auditability: mode, provider, model, format, chunks,
+  and duration.
+- Durable job and result records that survive an API restart.
+- Markdown and Unicode-safe DOCX exports.
+- PDF export for Latin-1 results, with a visible fallback to Markdown or DOCX
+  for other scripts.
+- A deterministic, network-free demo mode that works without an API key.
+- An optional live OpenRouter adapter with validated responses, bounded
+  retries, and client-safe failures.
+
+![Selected sample metadata](assets/02-selected-sample.png)
+
+![Structured result and downloads](assets/03-result.png)
+
+![Processing metadata and export controls](assets/04-downloads.png)
 
 ## Architecture
 
+```text
+Browser
+  |
+  v
+Streamlit UI :8501
+  |
+  | HTTP
+  v
+FastAPI :8000
+  |
+  +--> bounded validation and format detection
+  +--> extraction -> cleaning -> chunking
+  +--> deterministic demo provider OR OpenRouter
+  +--> SQLite job/result store
 ```
-┌──────────────────┐        HTTP        ┌──────────────────────────────┐
-│  Streamlit UI    │ ◄────────────────► │  FastAPI Backend             │
-│  (port 8501)     │                    │  (port 8000)                 │
-│                  │  POST /process     │                              │
-│  Upload file ────┼──────────────────► │  ┌────────────────────────┐  │
-│                  │  { job_id }        │  │ Pipeline               │  │
-│  Poll status ────┼──────────────────► │  │  detector  → extractor │  │
-│                  │  { status }        │  │  → cleaner → chunker   │  │
-│  Fetch result ───┼──────────────────► │  │  → LLM summarizer      │  │
-│                  │  { summary }       │  └────────────────────────┘  │
-└──────────────────┘                    └──────────────────────────────┘
-```
 
-## How It Works
+FastAPI background tasks are intentionally used for this single-process
+portfolio release. A production multi-worker system should replace them with
+an external queue.
 
-1. **Upload** — User selects a file in the Streamlit UI and clicks "Summarize it"
-2. **Detect** — `python-magic` reads file bytes to determine MIME type
-3. **Extract** — Format-specific extractor pulls plain text (pypdf, python-docx, BeautifulSoup, csv)
-4. **Clean** — Unicode normalization (NFKC), null byte removal, whitespace collapsing
-5. **Chunk** — Text is split by paragraph boundaries into chunks of ~8000 characters
-6. **Summarize** — Each chunk is sent to Google Gemini, responses are validated against a Pydantic schema
-7. **Merge** — Multi-chunk documents get a final merge pass through the LLM
-8. **Return** — Structured JSON result: summary, key points, language, word count
+## Supported formats
 
-Jobs are processed asynchronously — the upload returns instantly with a `job_id`, and the frontend polls for status every 2 seconds.
+| Format | Processing | Limitation |
+| --- | --- | --- |
+| PDF | Text extraction with pypdf | No OCR for scanned/image-only PDFs |
+| DOCX | Paragraph extraction with python-docx | Unsafe ZIP expansion is rejected before parsing |
+| TXT | UTF-8 text decoding | Invalid bytes are safely replaced |
+| HTML | Visible text; scripts and styles removed | It is not a browser renderer |
+| CSV | Rows converted to readable text | CSV/plain-text MIME ambiguity is validated explicitly |
 
-## Supported Formats
+Uploads are read with a configured byte limit. Raw source files are not stored
+after processing. SQLite stores safe file metadata, lifecycle state, result,
+and provider/model metadata.
 
-| Format | Library | Notes |
-|--------|---------|-------|
-| PDF | `pypdf` | Extracts text from all pages |
-| DOCX | `python-docx` | Paragraph-level text extraction |
-| HTML | `beautifulsoup4` | Strips scripts, styles, and tags |
-| CSV | `csv` (stdlib) | Converts rows to readable text |
-| TXT | — | UTF-8 decode with error replacement |
+## Quick start: offline demo
 
-## Setup
-
-### 1. Install dependencies
+Requirements: Python 3.11+, [uv](https://docs.astral.sh/uv/), and system
+`libmagic`.
 
 ```bash
-pip install fastapi uvicorn google-generativeai pypdf python-docx beautifulsoup4 python-magic python-dotenv pydantic streamlit requests python-multipart
+uv sync --group dev --no-lock
+cp .env.example .env
 ```
 
-### 2. Configure environment
-
-Create a `.env` file in the project root:
-
-```env
-GEMINI_KEY=your_gemini_api_key
-MAX_CHUNK_SIZE=8000
-```
-
-Get a Gemini API key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey).
-
-### 3. Run
-
-Start both services in separate terminals:
+Run the API:
 
 ```bash
-# Terminal 1 — Backend
-uvicorn backend.main:app --reload
-
-# Terminal 2 — Frontend
-streamlit run frontend/app.py
+uv run --no-sync uvicorn backend.main:app --reload
 ```
 
-Open [http://localhost:8501](http://localhost:8501) in your browser.
+Run the UI in a second terminal:
 
-## API Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/process` | Upload a file (multipart), returns `{ "job_id": "..." }` |
-| `GET` | `/jobs/{job_id}` | Poll job status: `pending` → `processing` → `done` / `failed` |
-| `GET` | `/jobs/{job_id}/result` | Fetch result (only when status is `done`) |
-
-You can test the API directly at [http://localhost:8000/docs](http://localhost:8000/docs) (auto-generated Swagger UI).
-
-## Project Structure
-
-```
-backend/
-├── main.py              FastAPI app, endpoints, background pipeline runner
-├── config.py            Environment variables (GEMINI_KEY, MAX_CHUNK_SIZE), Status enum
-├── models.py            DocumentSummary Pydantic model
-├── jobs.py              In-memory job store (dict keyed by UUID)
-└── pipeline/
-    ├── detector.py      MIME type detection via python-magic
-    ├── extractor.py     Per-format text extraction (match/case routing)
-    ├── cleaner.py       Text normalization (unicode, whitespace, null bytes)
-    ├── chunker.py       Paragraph-aware text splitting
-    ├── llm.py           Gemini API calls, JSON parsing, retry logic
-    └── constants.py     MIME subtype → canonical type mapping
-frontend/
-└── app.py               Streamlit UI (upload, polling, result display, download)
+```bash
+uv run --no-sync streamlit run frontend/app.py
 ```
 
-## Error Handling
+Open `http://localhost:8501`. Demo mode is deterministic, offline, and does
+not need an API key.
 
-- **Unsupported file type** — Backend raises `ValueError`, frontend shows error message
-- **LLM quota exceeded (429)** — Caught and reported as "AI service quota exceeded"
-- **LLM server errors (5xx)** — Reported as "AI service temporarily unavailable"
-- **Invalid LLM response** — Pydantic validation catches malformed JSON, retries once
-- **File too large** — Backend rejects uploads over 50 MB with HTTP 413
-- **Polling timeout** — Frontend stops polling after 5 minutes and shows timeout error
+## Docker
+
+```bash
+docker compose up --build
+```
+
+Open:
+
+- UI: `http://localhost:8501`
+- API docs: `http://localhost:8000/docs`
+- Health: `http://localhost:8000/health`
+
+The Compose setup uses a named volume for SQLite results.
+
+## Optional OpenRouter mode
+
+Set these values in `.env`:
+
+```dotenv
+SUMMARY_MODE=openrouter
+OPENROUTER_API_KEY=replace_with_your_key
+OPENROUTER_MODEL=meta-llama/llama-3.3-70b-instruct:free
+```
+
+Model availability and free-tier quotas are controlled by OpenRouter and can
+change. The application records the requested and routed model when the
+provider returns that metadata. Tests never contact OpenRouter.
+
+## API
+
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| `GET` | `/health` | Database health and current processing mode |
+| `POST` | `/process` | Validate and enqueue a multipart document |
+| `GET` | `/jobs/{job_id}` | Read lifecycle state and safe source metadata |
+| `GET` | `/jobs/{job_id}/result` | Read a completed structured result |
+
+Lifecycle:
+
+```text
+PENDING -> PROCESSING -> COMPLETED
+                     \-> FAILED
+```
+
+Interrupted `PROCESSING` records are marked failed on startup with a stable
+re-upload message. Invalid uploads are rejected before a job is created.
+
+## Quality evidence
+
+All automated tests are offline.
+
+```bash
+uv run --no-sync python -m compileall -q backend frontend tests
+uv run --no-sync ruff check .
+uv run --no-sync ruff format --check .
+uv run --no-sync pytest -q
+uv run --no-sync python scripts/generate_samples.py --check
+```
+
+Coverage includes:
+
+- Typed configuration and keyless startup.
+- Deterministic demo and mocked OpenRouter failures.
+- SQLite lifecycle, restart persistence, and corrupted-state handling.
+- Five-format extraction and full API integration.
+- DOCX archive-expansion safeguards.
+- Streamlit buyer states and safe sample selection.
+- Markdown, DOCX, and PDF export behavior.
+
+GitHub Actions runs the same offline compile, lint, format, sample, and test
+gates.
+
+## Data and security behavior
+
+- Raw source bytes exist only during processing and are not saved.
+- Routine logs exclude document text, filenames, and API keys.
+- Filenames are reduced to safe basenames and control characters are rejected.
+- DOCX archive metadata is checked before extraction to prevent extreme
+  decompression.
+- The project is a portfolio demonstration, not a compliance-certified or
+  multi-tenant production service.
+
+## What I can customize
+
+- Supported input formats and validation rules.
+- Summary fields and output schema.
+- Prompts, provider, and OpenRouter model selection.
+- Export templates and branding.
+- REST API integrations and webhook delivery.
+- Authentication, retention, queues, and deployment architecture for a
+  production engagement.
+
+## Known limitations
+
+- OCR is not included.
+- Background work is in-process and does not resume after a crash.
+- SQLite is intended for a single local/demo service.
+- PDF export is Latin-1 only; Markdown and DOCX preserve Unicode.
+- Public hosting, accounts, billing, and compliance controls are not included.
+
+## License
+
+[MIT](LICENSE)
