@@ -16,7 +16,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install project
-        run: uv sync --group dev --no-lock
+        run: uv sync --group dev
       - name: Compile
         run: uv run --no-sync python -m compileall -q backend frontend tests
       - name: Lint
